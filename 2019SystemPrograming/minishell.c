@@ -10,10 +10,12 @@ int main(void) {
 	char *args[MAX_LEN / 2];
 	char *input, *command;
 	char cd_buf[255];
-
+	
+	chdir("/");
 
 	while(1) {
 		int i = 0;
+		int check_int = 0;
 		getcwd(cd_buf,255);
 		printf("my_cd:%s> ",cd_buf);
 		fflush(stdout);
@@ -41,6 +43,11 @@ int main(void) {
 			if(chdir(args[1])){
 				perror("error");
 				exit(1);
+			}
+		}
+		else if(strcmp(args[0], "ls") == 0){
+			if(fork() == 0) {
+				execv("/bin/ls",args);
 			}
 		}
 		no_input:;
