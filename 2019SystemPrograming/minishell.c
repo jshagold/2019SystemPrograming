@@ -83,6 +83,9 @@ int main(void) {
 				execv("/bin/ls",args);
 			}
 		}
+		else {
+			printf("command not found\n");
+		}
 		no_input:;
 	}
 	close(fd);
