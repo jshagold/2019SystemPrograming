@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -11,21 +12,14 @@
 
 // seperate command function
 int run_command(char* args[MAX_LEN], char* host_dir);
-// seperate string by &&
-char** byand(char* origin);
-// return command array using by byand function
-char** auto_seper(char* command);
+// parsing
+char** parsing_command(char* command);
 
 
 
 int main(void) {
-
 	// origin command(= input)
 	char *input, *command;
-	// set of seperated command by &&
-	char* D_and[MAX_LEN];
-	// set of seperated command by &&,;
-	char* semi[MAX_LEN];
 	// set of seperated command by &&,;,&
 	char* parsed[MAX_LEN];
 	char* string;
@@ -43,159 +37,271 @@ int main(void) {
 	while(1) {
 		int i = 0, j = 0, k = 0;
 		int check_int = 0;
+		char* args[MAX_LEN];
 		getcwd(cd_buf,255);
 		printf("my_cd:%s> ",cd_buf);
 		fflush(stdout);
-
+		
+		// get input
 		input = (char*)malloc(sizeof(char)*MAX_LEN);
 		fgets(input, MAX_LEN, stdin);
-
 		command = strtok(input, "\n");
-
-		// array seperated by &&
-		char* result_semi[100];
-		char* result_final[100];
-
-		if(command != NULL){
-			D_and[i] = command;
-			do{
-				string2 = D_and[i];
-
-				string = strstr(D_and[i],"&&");
-
-				if(string != NULL) {
-					memset(string, '\0', 2);
-					D_and[i] = string2;
-					D_and[i+1] = "&&";
-					D_and[i+2] = string+2;
-				}
-				else {
-					D_and[i] = string2;
-					D_and[i+1] = NULL;
-					break;
-				}
-				i=i+2;
-			}
-			while(D_and[i] != NULL);
-
-			// command seperated by &&, ;
-			i = 0;
-			while(D_and[j] != NULL) {
-				char* semi_test;
-				semi_test = malloc(sizeof(char)*100);
-				char* semi_check;
-				semi_check = malloc(sizeof(char)*100);
-				strcpy(semi_test,D_and[j]);
-
-				semi[i] = strtok(semi_test,";");
-				while(semi[i] != NULL) {
-					i++;
-					semi_check = strtok(NULL, ";");
-					if(semi_check != NULL){
-						semi[i] = ";";
-						i++;
-						semi[i] = semi_check;
-					}
-					else {
-						semi[i] = NULL;
-					}
-				}
-				j++;
-			}
-
-			// command seperated by &&, ;, &
-			i=0;
-			j=0;
-			while(semi[j] != NULL) {
-				char* and_test;
-				and_test = malloc(sizeof(char)*100);
-				char* and_check;
-				and_check = malloc(sizeof(char)*100);
-				if(strcmp(semi[j], "&&") == 0){
-					parsed[i] = "&&";
-					i++;
-					j++;
-				}
-				strcpy(and_test,semi[j]);
-
-				parsed[i] = strtok(and_test,"&");
-				while(parsed[i] != NULL) {
-					i++;
-					and_check = strtok(NULL, "&");
-					if(and_check != NULL) {
-						parsed[i] = "&";
-						i++;
-						parsed[i] = and_check;
-					}
-					else {
-						parsed[i] = NULL;
-					}
-				}
-				j++;
-			}
-
-			i=0;
-			j=0;
-			while(parsed[i] != NULL){
-				// parsing seperated command by blank " "
-				char *args[MAX_LEN];
-				// distinguish command by &&, ;, &
-				if(strcmp(parsed[i], "&&") == 0) {
-					i++;
-					args[j] = strtok(parsed[i]," ");
-					while(args[j] != NULL){
-						j++;
-						args[j] = strtok(NULL, " ");
-					}
-					j=0;
-
-					run_command(args, host_dir);
-					i++;
-
-				}
-				else if(strcmp(parsed[i], ";") == 0) {
-					i++;
-					args[j] = strtok(parsed[i]," ");
-					while(args[j] != NULL){
-						j++;
-						args[j] = strtok(NULL, " ");
-					}
-					j=0;
-
-					run_command(args, host_dir);
-					i++;
-
-				}
-				else if(strcmp(parsed[i], "&") == 0) {
-					i++;
-					args[j] = strtok(parsed[i]," ");
-					while(args[j] != NULL){
-						j++;
-						args[j] = strtok(NULL, " ");
-					}
-					j=0;
-
-					run_command(args, host_dir);
-					i++;
-
-				}
-				else{
-					args[j] = strtok(parsed[i]," ");
-					while(args[j] != NULL){
-						j++;
-						args[j] = strtok(NULL, " ");
-					}
-					j=0;
-
-					run_command(args, host_dir);
-					i++;
-				}
-			}
+		
+		// input == NULL
+		if(command == NULL) {
+			goto no_input;	
 		}
+
+		// parsing by delimiters
+		memcpy(parsed, parsing_command(command), sizeof(parsed));
+
+		args[j] = strtok(parsed[i]," ");
+		while(args[j] != NULL){
+			j++;
+			args[j] = strtok(NULL, " ");
+		}
+		j=0;
+
+		run_command(args, host_dir);
+		i++;
+no_input:;
+
 	}
 	free(input);
+	free(host_dir);
 	return 0;
 }
+
+
+char** parsing_command(char* command) {
+	char* parsing_A[100];
+	char* parsing_B[100];
+	char* parsing_C[100];
+	char** result;
+	char* check;
+	char* string;
+	char* string2;
+	int i = 0;
+	int j = 0;
+	
+	if(command == NULL)
+		return NULL;
+
+	parsing_A[i] = command;
+	// parsing by &&
+	do{
+		string2 = parsing_A[i];
+		string = strstr(parsing_A[i],"&&");
+
+		if(string != NULL) {
+			memset(string, '\0', 2);
+			parsing_A[i] = string2;
+			parsing_A[i+1] = "&&";
+			parsing_A[i+2] = string+2;
+		}
+		else {
+			parsing_A[i] = string2;
+			parsing_A[i+1] = NULL;
+			break;
+		}
+		i=i+2;
+	}
+	while(parsing_A[i] != NULL);
+	// parsing by >>
+	i=0;
+	j=0;
+	while(parsing_A[j] != NULL){
+		parsing_B[i] = parsing_A[j];
+		do{
+			string2 = parsing_B[i];
+			string = strstr(parsing_B[i],">>");
+
+			if(string != NULL) {
+				memset(string, '\0', 2);
+				parsing_B[i] = string2;
+				parsing_B[i+1] = ">>";
+				parsing_B[i+2] = string+2;
+			}
+			else {
+				parsing_B[i] = string2;
+				parsing_B[i+1] = NULL;
+				break;
+			}
+			i=i+2;
+		}
+		while(parsing_B[i] != NULL);
+		i += 1;
+
+		if(parsing_A[j+1] == NULL){
+			break;
+		}
+		j = j + 1;
+	}
+	// parsing by >|
+	i=0;
+	j=0;
+	while(parsing_B[j] != NULL){
+		parsing_C[i] = parsing_B[j];
+		do{
+			string2 = parsing_C[i];
+			string = strstr(parsing_C[i],">|");
+
+			if(string != NULL) {
+				memset(string, '\0', 2);
+				parsing_C[i] = string2;
+                                parsing_C[i+1] = ">|";
+                                parsing_C[i+2] = string+2;
+                        }
+                        else {
+                                parsing_C[i] = string2;
+                                parsing_C[i+1] = NULL;
+                                break;
+                        }
+                        i=i+2;
+                }
+                while(parsing_C[i] != NULL);
+                i += 1;
+
+                if(parsing_B[j+1] == NULL){
+                        break;
+                }
+                j = j + 1;
+        }
+        // memset string array;
+        i=0;
+	while(parsing_A[i] != NULL) {
+		memset(parsing_A, 0, sizeof(char)*100);
+		i++;
+	}
+	// parsing by <
+	i=0;
+	j=0;
+	while(parsing_C[j] != NULL) {
+		parsing_A[i] = strtok(parsing_C[j],"<");
+		while(parsing_A[i] != NULL) {
+			i++;
+			check = strtok(NULL, "<");
+			if(check != NULL) {
+				parsing_A[i] = "<";
+				i++;
+			}
+			parsing_A[i] = check;
+		}
+		j++;
+	}
+	// memset string array;
+	i=0;
+	while(parsing_B[i] != NULL) {
+		memset(parsing_B, 0, sizeof(char)*100);
+		i++;
+	}
+	// parsing by &
+	i=0;
+	j=0;
+	while(parsing_A[j] != NULL) {
+                parsing_B[i] = strtok(parsing_A[j],"&");
+                while(parsing_B[i] != NULL) {
+                        i++;
+                        check = strtok(NULL, "&");
+                        if(check != NULL) {
+                                parsing_B[i] = "&";
+                                i++;
+                        }
+                        parsing_B[i] = check;
+                }
+                if(parsing_A[j+1] == NULL) {
+                        break;
+                }
+                parsing_B[i] = parsing_A[j+1];
+                i++;
+                j = j+2;
+        }
+	// memset string array;
+	i=0;
+	while(parsing_C[i] != NULL) {
+		memset(parsing_C, 0, sizeof(char)*100);
+		i++;
+	}
+	// parsing by ;
+	i=0;
+	j=0;
+	while(parsing_B[j] != NULL) {
+		parsing_C[i] = strtok(parsing_B[j],";");
+		while(parsing_C[i] != NULL) {
+                        i++;
+                        check = strtok(NULL, ";");
+                        if(check != NULL) {
+                                parsing_C[i] = ";";
+                                i++;
+                        }
+                        parsing_C[i] = check;
+                }
+                if(parsing_B[j+1] == NULL) {
+                        break;
+                }
+                parsing_C[i] = parsing_B[j+1];
+                i++;
+                j = j+2;
+        }
+        // memset string array;
+        i=0;
+        while(parsing_A[i] != NULL) {
+		memset(parsing_A, 0, sizeof(char)*100);
+		i++;
+	}
+	// parsing by |
+	i=0;
+	j=0;
+	while(parsing_C[j] != NULL) {
+		parsing_A[i] = strtok(parsing_C[j],"|");
+		while(parsing_A[i] != NULL) {
+			i++;
+			check = strtok(NULL, "|");
+                        if(check != NULL) {
+                                parsing_A[i] = "|";
+                                i++;
+			}
+			parsing_A[i] = check;
+		}
+		if(parsing_C[j+1] == NULL) {
+			break;
+		}
+		parsing_A[i] = parsing_C[j+1];
+		i++;
+		j = j+2;
+	}
+	// memset string array;
+	i=0;
+	while(parsing_B[i] != NULL) {
+		memset(parsing_B, 0, sizeof(char)*100);
+		i++;
+	}
+	// parsing by >
+	i=0;
+	j=0;
+	while(parsing_A[j] != NULL) {
+		parsing_B[i] = strtok(parsing_A[j],">");
+		while(parsing_B[i] != NULL) {
+			i++;
+			check = strtok(NULL, ">");
+			if(check != NULL) {
+				parsing_B[i] = ">";
+				i++;
+			}
+                        parsing_B[i] = check;
+                }
+                if(parsing_A[j+1] == NULL) {
+                        break;
+                }
+                parsing_B[i] = parsing_A[j+1];
+                i++;
+                j = j+2;
+        }
+
+	result = parsing_B;
+	return result;
+}
+
 
 
 
@@ -220,7 +326,7 @@ int run_command(char* args[MAX_LEN], char* host_dir){
 	else if(strcmp(args[0], "history") == 0){
 		if(fork() == 0) {
 			strcat(host_dir, "/.bash_history");
-			if(execl("/bin/cat", "cat", host_dir, 0) == -1){
+			if(execlp("cat", "cat", host_dir, 0) == -1){
 				return 1;
 			}
 		}
@@ -228,20 +334,22 @@ int run_command(char* args[MAX_LEN], char* host_dir){
 			wait(&status);
 	}	
 	// when input ls
-	else if(strcmp(args[0], "ls") == 0){
+	//else if(strcmp(args[0], "ls") == 0){
+	else{
 		if(fork() == 0) {
-			if(execv("/bin/ls",args) < 0){
-				return 1;
+			if(execvp(args[0],args) < 0){
+				printf("command not found\n");
+				exit(1);
 			}
 		}
 		else
 			wait(&status);
 	}
+	/*
 	else {
 		printf("command not found\n");
 	}
-no_input:;
-
+	*/
 	return 0;
 }
 
