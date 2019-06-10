@@ -1,0 +1,13 @@
+hello
+my_cd:/home/os/Desktop/sys_minishell/2019SystemPrograming> my_cd:/home/os/Desktop/sys_minishell/2019SystemPrograming> my_cd:/home/os/Desktop/sys_minishell/2019SystemPrograming> my_cd:/home/os/Desktop/sys_minishell/2019SystemPrograming> my_cd:/home/os/Desktop/sys_minishell/2019SystemPrograming> my_cd:/home/os/Desktop/sys_minishell/2019SystemPrograming> my_cd:/home/os/Desktop/sys_minishell/2019SystemPrograming> my_cd:/home/os/Desktop/sys_minishell/2019SystemPrograming> hello.txt
+hi.txt
+minishell
+minishell.c
+parsing
+parsing.c
+pipe_test
+pipe_test.c
+README.md
+test
+test.c
+my_cd:/home/os/Desktop/sys_minishell/2019SystemPrograming> 
