@@ -8,18 +8,19 @@
 #include <fcntl.h>
 
 #define MAX_LEN 100
+#define HIS_SIZE 100
 #define BUF_SIZE 256
 
 // seperate command function
-int run_command(char* args[MAX_LEN], char* host_dir, int redirect_check);
+int run_command(char* args[MAX_LEN], char* host_dir, int redirect_check, char* hist[HIS_SIZE], int current);
 // parsing
 char **parsing_command(char* command);
 // distinguish by delimiters
-void distinguish(char* command[MAX_LEN], char* host_dir);
+void distinguish(char* command[MAX_LEN], char* host_dir, char* hist[HIS_SIZE], int current);
 // redirect
-void redirect(char* f_command, char* b_command, char* delimiter, char* host_dir);
+void redirect(char* f_command, char* b_command, char* delimiter, char* host_dir, char* hist[HIS_SIZE], int current);
 // pipe
-void pipe_command(char* command, char* host_dir);
+void pipe_command(char* command, char* host_dir, char* hist[HIS_SIZE], int current);
 // make filename
 char* filename(char* command);
 
@@ -33,6 +34,10 @@ int main(void)
 	char* string2;
 	// current working directory
 	char cd_buf[BUF_SIZE];
+	// history buffer
+	char* hist[HIS_SIZE];
+	int current = 0;
+
 
 	// initialize directory to user directory
 	char* username = getenv("USER");
@@ -53,6 +58,15 @@ int main(void)
 		input = (char *)malloc(sizeof(char) * MAX_LEN);
 		fgets(input, MAX_LEN, stdin);
 		command = strtok(input, "\n");
+		
+		// input history buffer
+		if(command == NULL) {
+			hist[current] = " ";
+		}
+		else
+			hist[current] = strdup(command);
+		
+		current = (current + 1) % HIS_SIZE;
 
 		// input == NULL
 		if (command == NULL)
@@ -62,10 +76,11 @@ int main(void)
 
 		// parsing by delimiters
 		memcpy(parsed, parsing_command(command), sizeof(parsed));
-		distinguish(parsed, host_dir);	
+		distinguish(parsed, host_dir, hist, current);	
 		i++;
 	no_input:;
 	}
+
 	free(input);
 	free(host_dir);
 	return 0;
@@ -335,12 +350,11 @@ char** parsing_command(char* command)
 	return result;
 }
 
-int run_command(char* args[MAX_LEN], char* host_dir, int redirect_check)
+int run_command(char* args[MAX_LEN], char* host_dir, int redirect_check, char* hist[HIS_SIZE], int current)
 {
 
 	int status;
 	int h_n = 0;
-	char history_buf[BUF_SIZE];
 
 	// when input exit
 	if (strcmp(args[0], "exit") == 0)
@@ -361,21 +375,65 @@ int run_command(char* args[MAX_LEN], char* host_dir, int redirect_check)
 			return 1;
 		}
 	}
-	//when input history
-	else if (strcmp(args[0], "history") == 0)
+	//when input bg
+	else if (strcmp(args[0], "bg") == 0)
 	{
 		if (fork() == 0)
 		{
-			strcat(host_dir, "/.bash_history");
 			if(redirect_check != 1) {	
 				dup2(redirect_check, 1);
 				close(redirect_check);
 			}
 
-			if (execlp("cat", "cat", host_dir, 0) == -1)
+			if (system("bg") == -1)
 			{
+				exit(0);
 				return 1;
 			}
+			exit(0);
+		}
+		else
+			wait(&status);
+	}
+	//when input jobs
+	else if (strcmp(args[0], "jobs") == 0)
+	{
+		if (fork() == 0)
+		{
+			if(redirect_check != 1) {	
+				dup2(redirect_check, 1);
+				close(redirect_check);
+			}
+
+			if (system("jobs") == -1)
+			{
+				exit(0);
+				return 1;
+			}
+			exit(0);
+		}
+		else
+			wait(&status);
+	}
+	//when input history
+	else if (strcmp(args[0], "history") == 0)
+	{
+		if (fork() == 0)
+		{
+			if(redirect_check != 1) {	
+				dup2(redirect_check, 1);
+				close(redirect_check);
+			}
+			int i = 0;
+			int hist_num = 1;
+			do {
+				printf("%d  %s\n", hist_num, hist[i]);
+				hist_num++;
+
+				i = (i + 1) % HIS_SIZE;
+
+			} while (i != current);
+
 		}
 		else
 			wait(&status);
@@ -401,7 +459,7 @@ int run_command(char* args[MAX_LEN], char* host_dir, int redirect_check)
 	return 0;
 }
 
-void distinguish(char* command[MAX_LEN], char* host_dir)
+void distinguish(char* command[MAX_LEN], char* host_dir, char* hist[HIS_SIZE], int current)
 {
 	char* args[MAX_LEN];
 	int i = 0;
@@ -420,7 +478,7 @@ void distinguish(char* command[MAX_LEN], char* host_dir)
 			}
 			j = 0;
 
-			run_command(args, host_dir, redirect_check);
+			run_command(args, host_dir, redirect_check, hist, current);
 			break;
 		}
 		else if (strcmp(command[i + 1], ";") == 0)
@@ -433,7 +491,7 @@ void distinguish(char* command[MAX_LEN], char* host_dir)
 			}
 			j = 0;
 
-			run_command(args, host_dir, redirect_check);
+			run_command(args, host_dir, redirect_check, hist, current);
 			i = i + 2;
 		}
 		else if (strcmp(command[i + 1], "&") == 0)
@@ -448,7 +506,7 @@ void distinguish(char* command[MAX_LEN], char* host_dir)
 
 			if (fork() == 0)
 			{
-				run_command(args, host_dir, redirect_check);
+				run_command(args, host_dir, redirect_check, hist, current);
 			}
 			i = i + 2;
 		}
@@ -462,30 +520,30 @@ void distinguish(char* command[MAX_LEN], char* host_dir)
 			}
 			j = 0;
 
-			if (run_command(args, host_dir, redirect_check) == 1)
+			if (run_command(args, host_dir, redirect_check, hist, current) == 1)
 			{
 				i = i + 4;
 			}
 			else
 			{
-				run_command(args, host_dir, redirect_check);
+				run_command(args, host_dir, redirect_check, hist, current);
 				i = i + 2;
 			}
 		}
 		else if ((strcmp(command[i + 1], ">") == 0) || (strcmp(command[i + 1], ">>") == 0) || (strcmp(command[i + 1], "<") == 0) || (strcmp(command[i + 1], ">|") == 0))
 		{
 
-			redirect(command[i], command[i + 2], command[i + 1], host_dir);
+			redirect(command[i], command[i + 2], command[i + 1], host_dir, hist, current);
 			i = i + 4;
 		}
 		else if (strcmp(command[i + 1], "|") == 0)
 		{
-			pipe_command(command[i], host_dir);
+			pipe_command(command[i], host_dir, hist, current);
 		}
 	}
 }
 
-void redirect(char* f_command, char* b_command, char* delimiter, char* host_dir)
+void redirect(char* f_command, char* b_command, char* delimiter, char* host_dir, char* hist[HIS_SIZE], int current)
 {
 	char* args[MAX_LEN];
 	char* final_b_command;
@@ -509,14 +567,10 @@ void redirect(char* f_command, char* b_command, char* delimiter, char* host_dir)
 				args[j] = strtok(NULL, " ");
 			}
 			j = 0;
-			final_b_command = filename(b_command);
-			if(fork() == 0) {		
-				redirect_check = open(final_b_command, O_WRONLY | O_CREAT, 0666);
-				run_command(args, host_dir, redirect_check);
 			
-			}
-			else
-				wait(NULL);
+			final_b_command = filename(b_command);
+			redirect_check = open(final_b_command, O_WRONLY | O_CREAT, 0666);
+			run_command(args, host_dir, redirect_check, hist, current);
 		}
 		else if (strcmp(delimiter, ">>") == 0)
 		{
@@ -527,9 +581,10 @@ void redirect(char* f_command, char* b_command, char* delimiter, char* host_dir)
 				args[j] = strtok(NULL, " ");
 			}
 			j = 0;
-
-			redirect_check = open(b_command, O_RDWR | O_CREAT | O_APPEND, 0666);
-			run_command(args, host_dir, redirect_check);
+			
+			final_b_command = filename(b_command);
+			redirect_check = open(final_b_command, O_RDWR | O_CREAT | O_APPEND, 0666);
+			run_command(args, host_dir, redirect_check, hist, current);
 		}
 		else if (strcmp(delimiter, "<") == 0)
 		{
@@ -541,17 +596,28 @@ void redirect(char* f_command, char* b_command, char* delimiter, char* host_dir)
 			}
 			j = 0;
 			
-			redirect_check = open(b_command, O_RDONLY, 0666);
-			run_command(args, host_dir, redirect_check);
+			final_b_command = filename(b_command);
+			redirect_check = open(final_b_command, O_RDONLY, 0666);
+			run_command(args, host_dir, redirect_check, hist, current);
 		}
-		else if (strcmp(delimiter, ">!") == 0)
+		else if (strcmp(delimiter, ">|") == 0)
 		{
-			int fd;
+			args[j] = strtok(f_command, " ");
+			while (args[j] != NULL)
+			{
+				j++;
+				args[j] = strtok(NULL, " ");
+			}
+			j = 0;
+
+			final_b_command = filename(b_command);
+			redirect_check = open(final_b_command, O_RDONLY, 0666);
+			run_command(args, host_dir, redirect_check, hist, current);
 		}
 	}
 }
 
-void pipe_command(char* command, char* host_dir) {
+void pipe_command(char* command, char* host_dir, char* hist[HIS_SIZE], int current) {
 
 
 }
