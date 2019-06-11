@@ -1,12 +1,1 @@
-running : ls
-what!!!
-running : example.txt
-what!!!
-what's up?
-running : ls
-hmmm
-what's up?
-running : example.txt
-hmmm
-1111111111
-running : ls
+hi
