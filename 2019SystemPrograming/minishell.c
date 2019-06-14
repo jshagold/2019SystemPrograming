@@ -21,6 +21,7 @@ void distinguish(char* command[MAX_LEN], char* hist[HIS_SIZE], int current);
 void redirect(char* f_command, char* b_command, char* delimiter, char* hist[HIS_SIZE], int current);
 // pipe
 void pipe_command(char* command_arr[MAX_LEN], int pipe_num, char* hist[HIS_SIZE], int current);
+// f_pipe = input, s_pipe = output
 void pipe_run(char* args[MAX_LEN], int output_fd, int input_fd, int* f_pipe, int* s_pipe, char* hist[HIS_SIZE], int current);
 // make filename
 char* filename(char* command);
@@ -529,22 +530,28 @@ void distinguish(char* command[MAX_LEN], char* hist[HIS_SIZE], int current) {
 		}
 		else if (strcmp(command[i + 1], "|") == 0)
 		{
+			i = 0;
 			int j = 0;
 			int check_pipen = 1;
-			int cmp_i = i + 1;
+			int cmp_i = 3;
 			char* command_arr[MAX_LEN];
-			
+
 			command_arr[j] = command[i];
 			j++;
 			command_arr[j] = command[i+2];
 			j++;
-			while(strcmp(command[cmp_i + 2], "|") == 0) {
-				command_arr[j] = command[cmp_i + 3];
-				j++;		
-				cmp_i = cmp_i + 2;
-				check_pipen++;
+			if(command[cmp_i] != NULL){
+				while(strcmp(command[cmp_i], "|") == 0) {
+					command_arr[j] = command[cmp_i+1];
+					j++;		
+					cmp_i = cmp_i + 2;
+					check_pipen++;
+					if(command[cmp_i] == NULL)
+						break;
+				}
 			}
 			pipe_command(command_arr, check_pipen, hist, current);
+			i = cmp_i + 1;
 		}
 	}
 }
@@ -612,17 +619,25 @@ void pipe_command(char* command_arr[MAX_LEN], int pipe_num, char* hist[HIS_SIZE]
 			if(i > 0) {
 				waitpid(pid[i-1],NULL,0);
 			}
-			
-			pipe_run(args, output_fd, input_fd, pipeM[i], hist, current);
+			if(i == 0) {
+				pipe_run(args, output_fd, input_fd, pipeM[i], NULL, hist, current);
+				exit(0);
+			}
+			else if(i == pipe_num) {
+				pipe_run(args, output_fd, input_fd, NULL, pipeM[i-1], hist, current);
+				exit(0);
+			}
+			else {
+				pipe_run(args, output_fd, input_fd, pipeM[i-1], pipeM[i], hist, current);
+				exit(0);
+			}
 		}
-		else {
-			waitpid(pid[i],NULL,0);
-		}	
+		if(i>0){
+			close(pipeM[i-1][0]);
+			close(pipeM[i-1][1]);
+		}
 	}
-	for(int i = 0; i < pipe_num; i++) {
-		close(pipeM[i][0]);
-		close(pipeM[i][1]);
-	}
+	waitpid(pid[pipe_num],NULL,0);
 }
 
 void pipe_run(char* args[MAX_LEN], int output_fd, int input_fd, int* f_pipe, int* s_pipe, char* hist[HIS_SIZE], int current) {
@@ -642,6 +657,26 @@ void pipe_run(char* args[MAX_LEN], int output_fd, int input_fd, int* f_pipe, int
 				dup2(output_fd, 1);
 				close(output_fd);
 			}
+			// pipe		
+			if(s_pipe == NULL){
+				close(f_pipe[0]);
+				dup2(f_pipe[1],1);
+				close(f_pipe[1]);
+			}
+			else if(f_pipe == NULL) {
+				close(s_pipe[1]);
+				dup2(s_pipe[0],0);
+				close(s_pipe[0]);		
+			}
+			else {
+				close(f_pipe[0]);
+				dup2(f_pipe[1],1);
+				close(f_pipe[1]);
+				close(s_pipe[1]);
+				dup2(s_pipe[0],0);
+				close(s_pipe[0]);
+			}
+			// execute
 			if (chdir(args[1]))
 			{
 				perror("error");
@@ -661,6 +696,26 @@ void pipe_run(char* args[MAX_LEN], int output_fd, int input_fd, int* f_pipe, int
 				dup2(output_fd, 1);
 				close(output_fd);
 			}
+			// pipe
+			if(s_pipe == NULL){
+				close(f_pipe[0]);
+				dup2(f_pipe[1],1);
+				close(f_pipe[1]);
+			}
+			else if(f_pipe == NULL) {
+				close(s_pipe[1]);
+				dup2(s_pipe[0],0);
+				close(s_pipe[0]);		
+			}
+			else {
+				close(f_pipe[0]);
+				dup2(f_pipe[1],1);
+				close(f_pipe[1]);
+				close(s_pipe[1]);
+				dup2(s_pipe[0],0);
+				close(s_pipe[0]);
+			}
+			// execute
 			if (system("bg") == -1)
 			{
 				exit(0);
@@ -679,6 +734,26 @@ void pipe_run(char* args[MAX_LEN], int output_fd, int input_fd, int* f_pipe, int
 				dup2(output_fd, 1);
 				close(output_fd);
 			}
+			// pipe
+			if(s_pipe == NULL){
+				close(f_pipe[0]);
+				dup2(f_pipe[1],1);
+				close(f_pipe[1]);
+			}
+			else if(f_pipe == NULL) {
+				close(s_pipe[1]);
+				dup2(s_pipe[0],0);
+				close(s_pipe[0]);		
+			}
+			else {
+				close(f_pipe[0]);
+				dup2(f_pipe[1],1);
+				close(f_pipe[1]);
+				close(s_pipe[1]);
+				dup2(s_pipe[0],0);
+				close(s_pipe[0]);
+			}
+			//execute
 			if (system("jobs") == -1)
 			{
 				exit(0);
@@ -697,6 +772,26 @@ void pipe_run(char* args[MAX_LEN], int output_fd, int input_fd, int* f_pipe, int
 				dup2(output_fd, 1);
 				close(output_fd);
 			}
+			// pipe
+			if(s_pipe == NULL){
+				close(f_pipe[0]);
+				dup2(f_pipe[1],1);
+				close(f_pipe[1]);
+			}
+			else if(f_pipe == NULL) {
+				close(s_pipe[1]);
+				dup2(s_pipe[0],0);
+				close(s_pipe[0]);
+			}
+			else {
+				close(f_pipe[0]);
+				dup2(f_pipe[1],1);
+				close(f_pipe[1]);
+				close(s_pipe[1]);
+				dup2(s_pipe[0],0);
+				close(s_pipe[0]);
+			}	
+			// execute
 			int i = 0;
 			int hist_num = 1;
 			do {
@@ -718,14 +813,47 @@ void pipe_run(char* args[MAX_LEN], int output_fd, int input_fd, int* f_pipe, int
 				dup2(output_fd, 1);
 				close(output_fd);
 			}
+			// pipe
+			if(s_pipe == NULL){
+				close(f_pipe[0]);
+				dup2(f_pipe[1],1);
+				close(f_pipe[1]);
+			}
+			else if(f_pipe == NULL) {
+				close(s_pipe[1]);
+				dup2(s_pipe[0],0);
+				close(s_pipe[0]);
+			}
+			else {
+				close(f_pipe[0]);
+				dup2(f_pipe[1],1);
+				close(f_pipe[1]);
+				close(s_pipe[1]);
+				dup2(s_pipe[0],0);
+				close(s_pipe[0]);
+			}
+			// execute
 			if (execvp(args[0], args) < 0)
 			{
 				printf("command not found\n");
 				exit(1);
 			}
 		}
-		else
-			wait(&status);
+		if(s_pipe == NULL){
+			close(f_pipe[0]);
+			close(f_pipe[1]);
+		}
+		else if(f_pipe == NULL) {
+			close(s_pipe[1]);
+			close(s_pipe[0]);
+		}
+		else {
+			close(f_pipe[0]);
+			close(f_pipe[1]);
+			close(s_pipe[1]);
+			close(s_pipe[0]);
+		}
+		wait(&status);
 	}
 }
 

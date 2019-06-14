@@ -72,6 +72,7 @@ int main() {
 		execl("/bin/grep", "grep", "test", NULL);
 	}
 
+	printf("close\n");
 	close(pipeC[0]);
 	close(pipeC[1]);
 	waitpid(pid[1],NULL,0);
